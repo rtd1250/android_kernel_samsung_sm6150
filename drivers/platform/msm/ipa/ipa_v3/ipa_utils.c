@@ -5029,6 +5029,7 @@ int ipa3_cfg_ep_ctrl(u32 clnt_hdl, const struct ipa_ep_cfg_ctrl *ep_ctrl)
 		WARN_ON(1);
 		return -EPERM;
 	}
+	
 
 	if (ipa3_ctx->ipa_endp_delay_wa) {
 		IPAERR("pipe setting delay is not supported\n");

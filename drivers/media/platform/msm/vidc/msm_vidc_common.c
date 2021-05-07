@@ -5726,6 +5726,8 @@ static int msm_vidc_check_image_session_capabilities(struct msm_vidc_inst *inst)
 	return rc;
 }
 
+
+
 int msm_vidc_check_session_supported(struct msm_vidc_inst *inst)
 {
 	struct msm_vidc_capability *capability;

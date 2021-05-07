@@ -38,6 +38,16 @@
 #include "sde_color_processing.h"
 #include "sde_hw_rot.h"
 
+#if defined(CONFIG_DISPLAY_SAMSUNG) || defined(CONFIG_DISPLAY_SAMSUNG_LEGO)
+#include "sde_encoder.h"
+#include "ss_dsi_panel_common.h"
+#ifdef CONFIG_SEC_DEBUG
+#include <linux/sec_debug.h>
+#endif
+#endif
+
+#include "../../../../../drivers/gpu/msm/kgsl_device.h"
+
 #define SDE_DEBUG_PLANE(pl, fmt, ...) SDE_DEBUG("plane%d " fmt,\
 		(pl) ? (pl)->base.base.id : -1, ##__VA_ARGS__)
 
@@ -894,6 +904,8 @@ int sde_plane_wait_input_fence(struct drm_plane *plane, uint32_t wait_ms)
 	} else if (!plane->state) {
 		SDE_ERROR_PLANE(to_sde_plane(plane), "invalid state\n");
 	} else {
+		struct kgsl_device *device = kgsl_get_device(KGSL_DEVICE_3D0);
+
 		psde = to_sde_plane(plane);
 		pstate = to_sde_plane_state(plane->state);
 		input_fence = pstate->input_fence;
@@ -908,7 +920,26 @@ int sde_plane_wait_input_fence(struct drm_plane *plane, uint32_t wait_ms)
 						wait_ms, prefix);
 				psde->is_error = true;
 				sde_kms_timeline_status(plane->dev);
+
+#if defined(CONFIG_DISPLAY_SAMSUNG) || defined(CONFIG_DISPLAY_SAMSUNG_LEGO)
+				{
+					struct dma_fence *tout_fence = input_fence;
+
+					LCD_INFO("DPCI Logging for fence timeout\n");
+					ss_inc_ftout_debug(tout_fence->ops->get_timeline_name(tout_fence));
+				}
+#endif
 				ret = -ETIMEDOUT;
+				// Temporally add gpu snapsot for getting gpu information (Case 03183477)
+				mutex_lock(&device->mutex);
+				if (kgsl_state_is_awake(device)) {
+					device->force_panic = 1;  // case 03365510
+					kgsl_device_snapshot(device, NULL, false);
+				} else
+					printk("KGSL device is not awake\n");
+				mutex_unlock(&device->mutex);
+				/* case 03365510, prevent panic() here, to get full gpu snapshot.
+				 * panic("!!!FENCE TIMEOUT"); */ /* Added for debug purpose of fence */
 				break;
 			case -ERESTARTSYS:
 				SDE_ERROR_PLANE(psde,

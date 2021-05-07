@@ -584,6 +584,13 @@ static int ipa3_send_pdn_config_msg(unsigned long usr_param)
 
 	msg_meta.msg_type = pdn_info->pdn_cfg_type;
 
+	if ((pdn_info->pdn_cfg_type < IPA_PDN_DEFAULT_MODE_CONFIG) ||
+			(pdn_info->pdn_cfg_type >= IPA_PDN_CONFIG_EVENT_MAX)) {
+		IPAERR_RL("invalid pdn_cfg_type =%d", pdn_info->pdn_cfg_type);
+		kfree(pdn_info);
+		return -EINVAL;
+	}
+
 	IPADBG("type %d, interface name: %s, enable:%d\n", msg_meta.msg_type,
 		pdn_info->dev_name, pdn_info->enable);
 
@@ -3061,20 +3068,14 @@ static long ipa3_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 			break;
 		}
 
-		if (ep_info.max_ep_pairs != QUERY_MAX_EP_PAIRS) {
+		if (ep_info.max_ep_pairs != QUERY_MAX_EP_PAIRS)
 			IPAERR_RL("unexpected max_ep_pairs %d\n",
 			ep_info.max_ep_pairs);
-			retval = -EFAULT;
-			break;
-		}
 
-		if (ep_info.ep_pair_size != (QUERY_MAX_EP_PAIRS *
-			sizeof(struct ipa_ep_pair_info))) {
+		if (ep_info.ep_pair_size !=
+			(QUERY_MAX_EP_PAIRS * sizeof(struct ipa_ep_pair_info)))
 			IPAERR_RL("unexpected ep_pair_size %d\n",
 			ep_info.max_ep_pairs);
-			retval = -EFAULT;
-			break;
-		}
 
 		uptr = ep_info.info;
 		if (unlikely(!uptr)) {
@@ -9303,3 +9304,16 @@ module_param(emulation_type, uint, 0000);
 MODULE_PARM_DESC(
 	emulation_type,
 	"emulation_type=N N can be 13 for IPA 3.5.1, 14 for IPA 4.0, 17 for IPA 4.5");
+#if defined(CONFIG_ARGOS)
+void ipa3_set_napi_chained_rx(bool enable)
+{
+	if (!ipa3_ctx)
+		return;
+
+	if (enable && !ipa3_ctx->enable_napi_chain)
+		ipa3_ctx->enable_napi_chain = 1;
+	else if (!enable && ipa3_ctx->enable_napi_chain)
+		ipa3_ctx->enable_napi_chain = 0;
+}
+EXPORT_SYMBOL(ipa3_set_napi_chained_rx);
+#endif
