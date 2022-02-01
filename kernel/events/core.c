@@ -8851,6 +8851,9 @@ perf_event_parse_addr_filter(struct perf_event *event, char *fstr,
 				if (ret)
 					goto fail;
 
+				kfree(filename);
+				filename = NULL;
+
 				ret = -EINVAL;
 				if (!filter->path.dentry ||
 				    !S_ISREG(d_inode(filter->path.dentry)
