@@ -1734,15 +1734,24 @@ static __always_inline void delayed_free_task(struct task_struct *tsk)
 		free_task(tsk);
 }
 
-#ifdef CONFIG_RKP_KDP
-void rkp_assign_pgd(struct task_struct *p)
+static void copy_oom_score_adj(u64 clone_flags, struct task_struct *tsk)
 {
-	u64 pgd;
-	pgd = (u64)(p->mm ? p->mm->pgd : swapper_pg_dir);
+	/* Skip if kernel thread */
+	if (!tsk->mm)
+		return;
 
-	uh_call(UH_APP_RKP, RKP_KDP_X43, (u64)p->cred, (u64)pgd, 0, 0);
+	/* Skip if spawning a thread or using vfork */
+	if ((clone_flags & (CLONE_VM | CLONE_THREAD | CLONE_VFORK)) != CLONE_VM)
+		return;
+
+	/* We need to synchronize with __set_oom_adj */
+	mutex_lock(&oom_adj_mutex);
+	set_bit(MMF_MULTIPROCESS, &tsk->mm->flags);
+	/* Update the values in case they were changed after copy_signal */
+	tsk->signal->oom_score_adj = current->signal->oom_score_adj;
+	tsk->signal->oom_score_adj_min = current->signal->oom_score_adj_min;
+	mutex_unlock(&oom_adj_mutex);
 }
-#endif
 
 /*
  * This creates a new process as a copy of the old one,
@@ -2209,10 +2218,16 @@ static __latent_entropy struct task_struct *copy_process(
 
 	trace_task_newtask(p, clone_flags);
 	uprobe_copy_process(p, clone_flags);
+<<<<<<< HEAD
 #ifdef CONFIG_RKP_KDP
 	if (rkp_cred_enable)
 		rkp_assign_pgd(p);
 #endif
+=======
+
+	copy_oom_score_adj(clone_flags, p);
+
+>>>>>>> 0969fc7bc1bd0611254eb301368c42a2f6e88d3a
 	return p;
 
 bad_fork_cancel_cgroup:
