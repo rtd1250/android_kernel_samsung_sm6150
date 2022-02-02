@@ -2950,9 +2950,26 @@ static void rtl_runtime_suspend_enable(struct r8152 *tp, bool enable)
 
 static void rtl8153_runtime_enable(struct r8152 *tp, bool enable)
 {
-	rtl_runtime_suspend_enable(tp, enable);
-	tp->rtl_ops.u1u2_enable(tp, !enable);
-	tp->rtl_ops.u2p3_enable(tp, !enable);
+	if (enable) {
+		r8153_u1u2en(tp, false);
+		r8153_u2p3en(tp, false);
+		rtl_runtime_suspend_enable(tp, true);
+	} else {
+		rtl_runtime_suspend_enable(tp, false);
+
+		switch (tp->version) {
+		case RTL_VER_03:
+		case RTL_VER_04:
+			break;
+		case RTL_VER_05:
+		case RTL_VER_06:
+		default:
+			r8153_u2p3en(tp, true);
+			break;
+		}
+
+		r8153_u1u2en(tp, true);
+	}
 }
 
 static void rtl8153b_runtime_enable(struct r8152 *tp, bool enable)
@@ -5924,8 +5941,15 @@ static void r8153_init(struct r8152 *tp)
 
 	ocp_write_word(tp, MCU_TYPE_USB, USB_CONNECT_TIMER, 0x0001);
 
+	/* MAC clock speed down */
+	ocp_write_word(tp, MCU_TYPE_PLA, PLA_MAC_PWR_CTRL, 0);
+	ocp_write_word(tp, MCU_TYPE_PLA, PLA_MAC_PWR_CTRL2, 0);
+	ocp_write_word(tp, MCU_TYPE_PLA, PLA_MAC_PWR_CTRL3, 0);
+	ocp_write_word(tp, MCU_TYPE_PLA, PLA_MAC_PWR_CTRL4, 0);
+
 	r8153_power_cut_en(tp, false);
 	r8153_u1u2en(tp, true);
+	usb_enable_lpm(tp->udev);
 
 	/* MAC clock speed down */
 	ocp_write_word(tp, MCU_TYPE_PLA, PLA_MAC_PWR_CTRL, 0);
