@@ -1073,7 +1073,6 @@ static int __set_oom_adj(struct file *file, int oom_adj, bool legacy)
 	struct mm_struct *mm = NULL;
 	struct task_struct *task;
 	int err = 0;
-	int mm_users;
 
 #if DEBUG_SET_OOM_ADJ_TIME
 	unsigned long start_set_oom_adj = jiffies;

@@ -1481,8 +1481,6 @@ static int dwc3_probe(struct platform_device *pdev)
 	dwc3_debugfs_init(dwc);
 	return 0;
 
-<<<<<<< HEAD
-=======
 err5:
 	dwc3_event_buffers_cleanup(dwc);
 
@@ -1501,7 +1499,6 @@ err5:
 err4:
 	dwc3_free_scratch_buffers(dwc);
 
->>>>>>> c9573126ab9e5bc7b8e241aa2995006e0ffd9fce
 err3:
 	dwc3_free_scratch_buffers(dwc);
 err2:

@@ -2218,16 +2218,13 @@ static __latent_entropy struct task_struct *copy_process(
 
 	trace_task_newtask(p, clone_flags);
 	uprobe_copy_process(p, clone_flags);
-<<<<<<< HEAD
 #ifdef CONFIG_RKP_KDP
 	if (rkp_cred_enable)
 		rkp_assign_pgd(p);
 #endif
-=======
 
 	copy_oom_score_adj(clone_flags, p);
 
->>>>>>> 0969fc7bc1bd0611254eb301368c42a2f6e88d3a
 	return p;
 
 bad_fork_cancel_cgroup:
