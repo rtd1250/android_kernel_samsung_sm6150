@@ -108,6 +108,9 @@ static void dma_buf_release(struct dentry *dentry)
 
 	dmabuf = dentry->d_fsdata;
 
+	spin_lock(&dentry->d_lock);
+	dentry->d_fsdata = NULL;
+	spin_unlock(&dentry->d_lock);
 	BUG_ON(dmabuf->vmapping_counter);
 
 	/*
@@ -128,8 +131,7 @@ static void dma_buf_release(struct dentry *dentry)
 		reservation_object_fini(dmabuf->resv);
 
 	module_put(dmabuf->owner);
-	kfree(dmabuf->name);
-	kfree(dmabuf);
+	dmabuf_dent_put(dmabuf);
 }
 
 static int dma_buf_file_release(struct inode *inode, struct file *file)
