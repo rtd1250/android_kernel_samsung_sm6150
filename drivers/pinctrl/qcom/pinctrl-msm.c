@@ -2297,6 +2297,24 @@ static struct syscore_ops msm_pinctrl_pm_ops = {
 	.resume = msm_pinctrl_resume,
 };
 
+static bool __msm_gpio_has_control_mpm_wake(unsigned int gpio)
+{
+	unsigned int ngroups;
+	const struct msm_pingroup *g;
+
+	/* NOTE: to prevent out-of-bound access */
+	ngroups = msm_pinctrl_data->soc->ngroups;
+	if (gpio >= ngroups)
+		return false;
+
+	/* NOTE: MPM_WAKEUP_INT_EN is not rocated in the head */
+	g = &msm_pinctrl_data->soc->groups[gpio];
+	if (g->wake_reg)
+		return true;
+
+	return false;
+}
+
 /*
  * msm_gpio_mpm_wake_set - API to make interrupt wakeup capable
  * @gpio:       Gpio number to make interrupt wakeup capable
@@ -2307,6 +2325,9 @@ int msm_gpio_mpm_wake_set(unsigned int gpio, bool enable)
 	const struct msm_pingroup *g;
 	unsigned long flags;
 	u32 val;
+
+	if (!__msm_gpio_has_control_mpm_wake(gpio))
+		return -ENOENT;
 
 	g = &msm_pinctrl_data->soc->groups[gpio];
 	if (g->wake_bit == -1)
@@ -2324,7 +2345,65 @@ int msm_gpio_mpm_wake_set(unsigned int gpio, bool enable)
 
 	return 0;
 }
-EXPORT_SYMBOL(msm_gpio_mpm_wake_set);
+
+/*
+ * msm_gpio_mpm_wake_get - API to get interrupt wakeup capable
+ * @gpio:       Gpio number to get interrupt wakeup capable
+ */
+enum msm_gpio_wake msm_gpio_mpm_wake_get(unsigned int gpio)
+{
+	const struct msm_pingroup *g;
+	unsigned long flags;
+	unsigned long val;
+
+	if (!__msm_gpio_has_control_mpm_wake(gpio))
+		return MSM_GPIO_WAKE_NONE;
+
+	g = &msm_pinctrl_data->soc->groups[gpio];
+	if (g->wake_bit == -1)
+		return MSM_GPIO_WAKE_NONE;
+
+	raw_spin_lock_irqsave(&msm_pinctrl_data->lock, flags);
+	val = readl_relaxed(msm_pinctrl_data->regs + g->wake_reg);
+	val &= BIT(g->wake_bit);
+	raw_spin_unlock_irqrestore(&msm_pinctrl_data->lock, flags);
+
+	return val ? MSM_GPIO_WAKE_ENABLED : MSM_GPIO_WAKE_DISABLED;
+}
+
+static bool __msm_gpio_is_dir_conn_needed(unsigned int gpio)
+{
+	/* NOTE: 'msm_gpio_setup_dir_connects' will don't care only if
+	 * 'MSM_GPIO_WAKE_DISABLED' case.
+	 * 'MSM_GPIO_WAKE_NONE' should be handled to keep the backward
+	 *  compatiblities because if the device tree does not has
+	 * 'wakeup-disabled-gpios', 'msm_gpio_mpm_wake_get' always
+	 * returns 'MSM_GPIO_WAKE_NONE'.
+	 */
+	return msm_gpio_mpm_wake_get(gpio) != MSM_GPIO_WAKE_DISABLED;
+}
+
+static void __msm_gpio_parse_dt_disable_wakeup(struct msm_pinctrl *pctrl)
+{
+	const struct device_node *np = pctrl->dev->of_node;
+	int nr_gpios;
+	unsigned int gpio;
+	int i;
+	int err;
+
+	nr_gpios = of_property_count_u32_elems(np, "wakeup-disabled-gpios");
+	if (nr_gpios <= 0)
+		return;
+
+	for (i = 0; i < nr_gpios; i++) {
+		of_property_read_u32_index(np, "wakeup-disabled-gpios",
+				i, &gpio);
+		err = msm_gpio_mpm_wake_set(gpio, false);
+		if (err)
+			pr_warn("can't disable 'wakeup' for gpio-%d (%d)\n",
+					gpio, err);
+	}
+}
 
 int msm_pinctrl_probe(struct platform_device *pdev,
 		      const struct msm_pinctrl_soc_data *soc_data)
