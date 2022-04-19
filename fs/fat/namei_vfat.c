@@ -697,15 +697,6 @@ static int vfat_find(struct inode *dir, const struct qstr *qname,
 	return fat_search_long(dir, qname->name, len, sinfo);
 }
 
-/*
- * (nfsd's) anonymous disconnected dentry?
- * NOTE: !IS_ROOT() is not anonymous (I.e. d_splice_alias() did the job).
- */
-static int vfat_d_anon_disconn(struct dentry *dentry)
-{
-	return IS_ROOT(dentry) && (dentry->d_flags & DCACHE_DISCONNECTED);
-}
-
 static struct dentry *vfat_lookup(struct inode *dir, struct dentry *dentry,
 				  unsigned int flags)
 {
@@ -738,30 +729,16 @@ static struct dentry *vfat_lookup(struct inode *dir, struct dentry *dentry,
 	 * Checking "alias->d_parent == dentry->d_parent" to make sure
 	 * FS is not corrupted (especially double linked dir).
 	 */
-	if (alias && alias->d_parent == dentry->d_parent &&
-	    !vfat_d_anon_disconn(alias)) {
+	if (alias && alias->d_parent == dentry->d_parent) {
 		/*
-		 * Unhashed alias is able to exist because of revalidate()
-		 * called by lookup_fast. You can easily make this status
-		 * by calling create and lookup concurrently
-		 * In such case, we reuse an alias instead of new dentry
+		 * This inode has non anonymous-DCACHE_DISCONNECTED
+		 * dentry. This means, the user did ->lookup() by an
+		 * another name (longname vs 8.3 alias of it) in past.
+		 *
+		 * Switch to new one for reason of locality if possible.
 		 */
-		if (d_unhashed(alias)) {
-			BUG_ON(alias->d_name.hash_len != dentry->d_name.hash_len);
-			fat_msg(sb, KERN_INFO, "rehashed a dentry(%p) "
-					"in read lookup", alias);
-			d_drop(dentry);
-			d_rehash(alias);
-		} else if (!S_ISDIR(inode->i_mode)) {
-			/*
-			 * This inode has non anonymous-DCACHE_DISCONNECTED
-			 * dentry. This means, the user did ->lookup() by an
-			 * another name (longname vs 8.3 alias of it) in past.
-			 *
-			 * Switch to new one for reason of locality if possible.
-			 */
+		if (!S_ISDIR(inode->i_mode))
 			d_move(alias, dentry);
-		}
 		iput(inode);
 		mutex_unlock(&MSDOS_SB(sb)->s_lock);
 		return alias;
