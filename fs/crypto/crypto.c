@@ -445,10 +445,9 @@ static int __init fscrypt_init(void)
 	err = sdp_crypto_init();
 #endif
 	return 0;
-#ifdef CONFIG_FSCRYPT_SDP
+
 fail_free_info:
 	kmem_cache_destroy(fscrypt_info_cachep);
-#endif
 fail_free_queue:
 	destroy_workqueue(fscrypt_read_workqueue);
 fail:
