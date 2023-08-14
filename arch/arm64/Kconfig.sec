@@ -16,3 +16,16 @@ config SEC_A70Q_EUR_LDU_PROJECT
         help
           Support for Samsung A70Q EUR LDU Project
 
+config SEC_A70S_PROJECT
+        depends on ARCH_SM6150
+        default n
+        bool "Samsung A70S Project"
+        help
+          Support for Samsung A70S Project
+		  
+config SEC_A70S_SWA_PROJECT
+        depends on SEC_A70S_PROJECT
+        default n
+        bool "Samsung A70S SWA OPEN Project"
+        help
+          Support for Samsung A70S SWA OPEN Project
